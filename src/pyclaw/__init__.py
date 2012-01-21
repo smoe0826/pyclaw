@@ -31,6 +31,7 @@ import plot
 __all__.extend(['ClawSolver1D','ClawSolver2D','ClawSolver3D','SharpClawSolver1D','SharpClawSolver2D'])
 from pyclaw.clawpack.clawpack import ClawSolver1D, ClawSolver2D, ClawSolver3D
 from pyclaw.sharpclaw.sharpclaw import SharpClawSolver1D, SharpClawSolver2D
+from pyclaw.fluxdiff.fluxdiff import FluxDiffSolver1D
 
 
 # Sub-packages
