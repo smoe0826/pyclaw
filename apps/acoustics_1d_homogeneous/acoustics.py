@@ -21,6 +21,11 @@ def acoustics(use_petsc=False,kernel_language='Fortran',solver_type='classic',ip
     elif solver_type=='sharpclaw':
         solver = pyclaw.SharpClawSolver1D()
         solver.weno_order=weno_order
+    elif solver_type=='fluxdiff':
+        solver = pyclaw.FluxDiffSolver1D()
+        solver.weno_order=weno_order
+        from riemann import rp_acoustics
+        solver.flux = rp_acoustics.flux_acoustics_1d
     else: raise Exception('Unrecognized value of solver_type.')
 
     #========================================================================
