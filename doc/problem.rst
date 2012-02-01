@@ -44,7 +44,7 @@ Once you have initialize a State object, it contains a member state.q
 whose first dimension is num_eqn and whose remaining dimensions are those
 of the grid.  Now you must set the initial condition.  For instance::
 
-    >>> Y,X = np.meshgrid(grid.y.center,grid.x.center)
+    >>> Y,X = np.meshgrid(state.grid.y.center,state.grid.x.center)
     >>> r = np.sqrt(X**2 + Y**2)
     >>> width=0.2
     >>> state.q[0,:,:] = (np.abs(r-0.5)<=width)*(1.+np.cos(np.pi*(r-0.5)/width))

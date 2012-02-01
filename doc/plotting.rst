@@ -28,7 +28,7 @@ location of the HTML file.  To launch an interactive plotting session
 from within Python, do ::
 
     >>> from pyclaw import plot
-    >>> plot.plot_interactive()
+    >>> plot.interactive_plot()
 
 To see a list of commands available in the resulting interactive environment,
 type "?".
@@ -40,7 +40,7 @@ In order to plot from such files, just replace pyclaw with petclaw in the
 commands above; e.g.::
 
     >>> from petclaw import plot
-    >>> plot.plot_interactive()
+    >>> plot.interactive_plot()
 
 
 More advanced plotting
