@@ -1,7 +1,10 @@
 import pyclaw.state
 
 class State(pyclaw.state.State):
-    r"""  See the corresponding PyClaw class documentation."""
+    r"""Parallel State class based on the use of PETSc objects for communication.
+    
+    See the corresponding PyClaw class documentation.
+    """
 
     @property
     def num_eqn(self):
@@ -9,6 +12,12 @@ class State(pyclaw.state.State):
         if self.q_da is None:
             raise Exception('state.num_eqn has not been set.')
         else: return self.q_da.dof
+
+    @property
+    def num_aux(self):
+        r"""(int) - Number of auxiliary fields"""
+        if self.aux_da is None: return 0
+        else: return self.aux_da.dof
 
     @property
     def mp(self):
@@ -39,28 +48,15 @@ class State(pyclaw.state.State):
             self.gFVec = self._F_da.createGlobalVector()
 
     @property
-    def num_aux(self):
-        r"""(int) - Number of auxiliary fields"""
-        if self.aux_da is None: return 0
-        else: return self.aux_da.dof
-
-    @property
     def q(self):
         r"""
-        Array to store solution (q) values.
-
-        Settting state.num_eqn automatically allocates space for q, as does
-        setting q itself.
+        Array of solution values.
         """
-        if self.q_da is None: return 0
         shape = self.grid.num_cells
         shape.insert(0,self.num_eqn)
-        q=self.gqVec.getArray().reshape(shape, order = 'F')
-        return q
+        return self.gqVec.getArray().reshape(shape, order = 'F')
     @q.setter
     def q(self,val):
-        num_eqn = val.shape[0]
-        if self.gqVec is None: self._init_q_da(num_eqn)
         self.gqVec.setArray(val.reshape([-1], order = 'F'))
 
     @property
@@ -136,7 +132,7 @@ class State(pyclaw.state.State):
             self.patch = geom.patches[0]
         else:
             raise Exception("""A PetClaw State object must be initialized with
-                             a PetClaw Patch object.""")
+                             a PetClaw Patch or Domain object.""")
 
         self.aux_da = None
         self.q_da = None
@@ -164,21 +160,21 @@ class State(pyclaw.state.State):
         Initializes PETSc DA and global & local Vectors for handling the
         auxiliary array, aux. 
         
-        Initializes aux_da, gauxVec and lauxVec.
+        Initializes aux_da, gauxVec and _aux_local_vector.
         """
         self.aux_da = self._create_DA(num_aux,num_ghost)
         self.gauxVec = self.aux_da.createGlobalVector()
-        self.lauxVec = self.aux_da.createLocalVector()
+        self._aux_local_vector = self.aux_da.createLocalVector()
  
     def _init_q_da(self,num_eqn,num_ghost=0):
         r"""
         Initializes PETSc DA and Vecs for handling the solution, q. 
         
-        Initializes q_da, gqVec and lqVec.
+        Initializes q_da, gqVec and _q_local_vector.
         """
         self.q_da = self._create_DA(num_eqn,num_ghost)
         self.gqVec = self.q_da.createGlobalVector()
-        self.lqVec = self.q_da.createLocalVector()
+        self._q_local_vector = self.q_da.createLocalVector()
 
     def _create_DA(self,dof,num_ghost=0):
         r"""Returns a PETSc DA and associated global Vec.
@@ -224,12 +220,12 @@ class State(pyclaw.state.State):
         a local to global communication. 
         """
         
-        patch = self.patch
-        if patch.num_dim == 1:
+        num_dim = self.patch.num_dim
+        if num_dim == 1:
             self.q = qbc[:,num_ghost:-num_ghost]
-        elif patch.num_dim == 2:
+        elif num_dim == 2:
             self.q = qbc[:,num_ghost:-num_ghost,num_ghost:-num_ghost]
-        elif patch.num_dim == 3:
+        elif num_dim == 3:
             self.q = qbc[:,num_ghost:-num_ghost,num_ghost:-num_ghost,num_ghost:-num_ghost]
         else:
             raise NotImplementedError("The case of 3D is not handled in "\
@@ -243,14 +239,14 @@ class State(pyclaw.state.State):
         shape = [n + 2*num_ghost for n in self.grid.num_cells]
         
         if whichvec == 'q':
-            self.q_da.globalToLocal(self.gqVec, self.lqVec)
+            self.q_da.globalToLocal(self.gqVec, self._q_local_vector)
             shape.insert(0,self.num_eqn)
-            return self.lqVec.getArray().reshape(shape, order = 'F')
+            return self._q_local_vector.getArray().reshape(shape, order = 'F')
             
         elif whichvec == 'aux':
-            self.aux_da.globalToLocal(self.gauxVec, self.lauxVec)
+            self.aux_da.globalToLocal(self.gauxVec, self._aux_local_vector)
             shape.insert(0,self.num_aux)
-            return self.lauxVec.getArray().reshape(shape, order = 'F')
+            return self._aux_local_vector.getArray().reshape(shape, order = 'F')
 
     def set_num_ghost(self,num_ghost):
         r"""
