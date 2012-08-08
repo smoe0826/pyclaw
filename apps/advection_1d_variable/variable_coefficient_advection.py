@@ -30,7 +30,6 @@ def qinit(state):
 
 
 def auxinit(state):
-    # Initilize petsc Structures for aux
     xc=state.grid.x.centers
     state.aux[0,:] = np.sin(2.*np.pi*xc)+2
     
@@ -44,7 +43,7 @@ def vc_advection(use_petsc=False,solver_type='classic',kernel_language='Python',
 
     if solver_type=='sharpclaw':
         solver = pyclaw.SharpClawSolver1D()
-    else:
+    elif solver_type=='classic':
         solver = pyclaw.ClawSolver1D()
 
     from clawpack import riemann

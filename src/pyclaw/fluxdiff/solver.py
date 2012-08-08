@@ -1,16 +1,14 @@
 r"""
 A finite volume flux-differencing solver.
 """
-# Solver superclass
-from pyclaw.solver import Solver, CFLError
+from ..solver import Solver, CFLError
 
-# Reconstructor
 try:
     # load c-based WENO reconstructor (PyWENO)
-    from pyclaw.limiters import reconstruct as recon
+    from ..limiters import reconstruct as recon
 except ImportError:
     # load old WENO5 reconstructor
-    from pyclaw.limiters import recon
+    from ..limiters import recon
 
 
 def start_step(solver,solution):
@@ -83,7 +81,7 @@ class FluxDiffSolver(Solver):
         or pure Python ('Python').  
         ``Default = 'Fortran'``.
 
-    .. attribute:: mbc
+    .. attribute:: num_ghost
 
         Number of ghost cells.
         ``Default = 3``
@@ -124,7 +122,7 @@ class FluxDiffSolver(Solver):
         self.char_decomp = 0
         self.aux_time_dep = False
         self.kernel_language = 'Python'
-        self.mbc = (self.weno_order+1)/2
+        self.num_ghost = (self.weno_order+1)/2
         self.cfl_desired = 0.45
         self.cfl_max = 0.5
         self.dq_src = None
@@ -239,11 +237,11 @@ class FluxDiffSolver(Solver):
         self._rk_stages = []
         for i in xrange(nregisters-1):
             #Maybe should use State.copy() here?
-            self._rk_stages.append(State(state.patch,state.meqn,state.maux))
-            self._rk_stages[-1].aux_global       = state.aux_global
-            self._rk_stages[-1].set_mbc(self.mbc)
+            self._rk_stages.append(State(state.patch,state.num_eqn,state.num_aux))
+            self._rk_stages[-1].problem_data       = state.problem_data
+            self._rk_stages[-1].set_num_ghost(self.num_ghost)
             self._rk_stages[-1].t                = state.t
-            if state.maux > 0:
+            if state.num_aux > 0:
                 self._rk_stages[-1].aux              = state.aux
 
 
@@ -262,7 +260,7 @@ class FluxDiffSolver1D(FluxDiffSolver):
         r"""
         See :class:`FluxDiffSolver1D` for more info.
         """   
-        self.ndim = 1
+        self.num_dim = 1
         super(FluxDiffSolver1D,self).__init__()
 
 
@@ -270,12 +268,12 @@ class FluxDiffSolver1D(FluxDiffSolver):
         """
         Allocate RK stage arrays and fortran routine work arrays.
         """
-        self.mbc = (self.weno_order+1)/2
+        self.num_ghost = (self.weno_order+1)/2
 
         # This is a hack to deal with the fact that petsc4py
-        # doesn't allow us to change the stencil_width (mbc)
+        # doesn't allow us to change the stencil_width (num_ghost)
         state = solution.state
-        state.set_mbc(self.mbc)
+        state.set_num_ghost(self.num_ghost)
         # End hack
 
         self.allocate_rk_stages(solution)
@@ -291,27 +289,27 @@ class FluxDiffSolver1D(FluxDiffSolver):
         import numpy as np
 
         self.apply_q_bcs(state)
+        if state.num_aux > 0:
+            self.apply_aux_bcs(state)
+        grid = state.grid
         q = self.qbc 
 
-        patch = state.patch
-        mx = patch.ng[0]
-
-        ixy=1
+        num_cells = grid.num_cells[0]
 
         if self.kernel_language=='Fortran':
             raise NotImplementedError
 
         elif self.kernel_language=='Python':
 
-            dtdx = np.zeros( (mx+2*self.mbc) ,order='F')
-            dq   = np.zeros( (state.meqn,mx+2*self.mbc) ,order='F')
-            f    = np.zeros( (state.meqn,mx+2*self.mbc) ,order='F')
+            dtdx = np.zeros( (num_cells+2*self.num_ghost) ,order='F')
+            dq   = np.zeros( (state.num_eqn,num_cells+2*self.num_ghost) ,order='F')
+            flux = np.zeros( (state.num_eqn,num_cells+2*self.num_ghost) ,order='F')
 
             # Find local value for dt/dx
-            if state.mcapa>=0:
-                dtdx = self.dt / (patch.d[0] * state.aux[state.mcapa,:])
+            if state.index_capa>=0:
+                dtdx = self.dt / (grid.delta[0] * state.aux[state.index_capa,:])
             else:
-                dtdx += self.dt/patch.d[0]
+                dtdx += self.dt/grid.delta[0]
  
             aux=self.auxbc
             if aux.shape[0]>0:
@@ -329,25 +327,25 @@ class FluxDiffSolver1D(FluxDiffSolver):
             # Solve Riemann problem at each interface
             q_l=qr[:,:-1]
             q_r=ql[:,1: ]
-            flux,s = self.flux(q_l,q_r,aux_l,aux_r,state.aux_global)
+            flux,s = self.flux(q_l,q_r,aux_l,aux_r,state.problem_data)
 
             # Loop limits for local portion of patch
             # THIS WON'T WORK IN PARALLEL!
-            LL = self.mbc - 1
-            UL = patch.ng[0] + self.mbc + 1
+            LL = self.num_ghost - 1
+            UL = grid.num_cells[0] + self.num_ghost + 1
 
             # Compute maximum wave speed
             cfl = 0.0
-            for mw in xrange(self.mwaves):
+            for mw in xrange(self.num_waves):
                 smax1 = np.max( dtdx[LL  :UL]  *s[mw,LL-1:UL-1])
                 smax2 = np.max(-dtdx[LL-1:UL-1]*s[mw,LL-1:UL-1])
                 cfl = max(cfl,smax1,smax2)
 
             # Compute dq
-            for m in xrange(state.meqn):
+            for m in xrange(state.num_eqn):
                 dq[m,LL:UL] = -dtdx[LL:UL]*(flux[m,LL:UL] - flux[m,LL-1:UL-1])
 
         else: raise Exception('Unrecognized value of solver.kernel_language.')
 
         self.cfl.update_global_max(cfl)
-        return dq[:,self.mbc:-self.mbc]
+        return dq[:,self.num_ghost:-self.num_ghost]

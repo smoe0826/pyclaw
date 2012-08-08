@@ -1,5 +1,17 @@
 #!/usr/bin/env python
 # encoding: utf-8
+
+def flux_advection(q_l, q_r, aux_l, aux_r, problem_data):
+    r""" Flux function for advection."""
+    import numpy as np
+
+    s = np.zeros((1,q_l.shape[-1])) + problem_data['u']
+    if problem_data['u']>0:
+        flux = q_l
+    else:
+        flux = q_r
+    return flux, s
+
 def advection(kernel_language='Python',iplot=False,htmlplot=False,use_petsc=False,solver_type='classic',outdir='./_output'):
     """
     Example python script for solving the 1d advection equation.
@@ -13,8 +25,12 @@ def advection(kernel_language='Python',iplot=False,htmlplot=False,use_petsc=Fals
 
     if solver_type=='sharpclaw':
         solver = pyclaw.SharpClawSolver1D()
-    else:
+    elif solver_type=='classic':
         solver = pyclaw.ClawSolver1D()
+    elif solver_type=='fluxdiff':
+        solver = pyclaw.FluxDiffSolver1D()
+        solver.flux = flux_advection
+
 
     solver.kernel_language = kernel_language
     from clawpack.riemann import rp_advection
