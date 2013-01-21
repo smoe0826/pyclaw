@@ -8,6 +8,8 @@ def acoustics(use_petsc=False,kernel_language='Fortran',solver_type='classic',ip
     """
     from numpy import sqrt, exp, cos
 
+    num_eqn = 2
+
     #=================================================================
     # Import the appropriate classes, depending on the options passed
     #=================================================================
@@ -21,6 +23,11 @@ def acoustics(use_petsc=False,kernel_language='Fortran',solver_type='classic',ip
     elif solver_type=='sharpclaw':
         solver = pyclaw.SharpClawSolver1D()
         solver.weno_order=weno_order
+    elif solver_type=='dgclaw':
+        solver = pyclaw.DGClawSolver1D()
+        solver.weno_order=weno_order
+        ndof = 2
+        num_eqn = num_eqn*ndof
     else: raise Exception('Unrecognized value of solver_type.')
 
     #========================================================================
@@ -46,7 +53,6 @@ def acoustics(use_petsc=False,kernel_language='Fortran',solver_type='classic',ip
     #========================================================================
     x = pyclaw.Dimension('x',0.0,1.0,100)
     domain = pyclaw.Domain(x)
-    num_eqn = 2
     state = pyclaw.State(domain,num_eqn)
 
     #========================================================================
@@ -68,6 +74,9 @@ def acoustics(use_petsc=False,kernel_language='Fortran',solver_type='classic',ip
     beta=100; gamma=0; x0=0.75
     state.q[0,:] = exp(-beta * (xc-x0)**2) * cos(gamma * (xc - x0))
     state.q[1,:] = 0.
+    if solver_type == 'dgclaw':
+        state.q[2,:] = 0.
+        state.q[3,:] = 0.
 
     solver.dt_initial=domain.grid.delta[0]/state.problem_data['cc']*0.1
 

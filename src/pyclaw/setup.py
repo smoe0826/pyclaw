@@ -7,6 +7,7 @@ def configuration(parent_package='',top_path=None):
     config.add_data_files('log.config')
     config.add_subpackage('classic')
     config.add_subpackage('sharpclaw')
+    config.add_subpackage('dgclaw')
     config.add_subpackage('io')
     config.add_subpackage('limiters')
     return config

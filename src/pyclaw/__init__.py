@@ -22,9 +22,10 @@ from .cfl import CFL
 
 import plot
 
-__all__.extend(['ClawSolver1D','ClawSolver2D','ClawSolver3D','SharpClawSolver1D','SharpClawSolver2D'])
+__all__.extend(['ClawSolver1D','ClawSolver2D','ClawSolver3D','SharpClawSolver1D','SharpClawSolver2D','DGClawSolver1D','DGClawSolver2D'])
 from .classic.solver import ClawSolver1D, ClawSolver2D, ClawSolver3D
 from .sharpclaw.solver import SharpClawSolver1D, SharpClawSolver2D
+from .dgclaw.solver import DGClawSolver1D, DGClawSolver2D
 
 
 # Sub-packages
